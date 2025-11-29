@@ -235,8 +235,30 @@ class Connect4:
         # Minimax algorithm with optional alpha-beta pruning
         # Returns (best_score, stats_dict)
         
-        # Check for terminal states
+        if stats is None:
+            stats = {
+                'nodes_evaluated': 0,
+                'nodes_pruned': 0,
+                'depth_reached': {},
+                'scores_at_depth': {}
+            }
         
+        stats['nodes_evaluated'] += 1
+        
+        # Check for terminal states - WIN CHECK FIRST (most important!)
+        winner = self.check_winner()
+        if winner == self.COMPUTER:
+            stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
+            if depth not in stats['scores_at_depth']:
+                stats['scores_at_depth'][depth] = []
+            stats['scores_at_depth'][depth].append(1000)
+            return 1000, stats
+        elif winner == self.HUMAN:
+            stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
+            if depth not in stats['scores_at_depth']:
+                stats['scores_at_depth'][depth] = []
+            stats['scores_at_depth'][depth].append(-1000)
+            return -1000, stats
         
         if self.is_board_full():
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
@@ -311,6 +333,35 @@ class Connect4:
         if not valid_moves:
             return -1, {}
         
+        # FIRST: Check for immediate winning moves (highest priority!)
+        for move in valid_moves:
+            self.make_move(move, self.COMPUTER)
+            if self.check_winner() == self.COMPUTER:
+                self.undo_move(move)
+                # Return immediately - this is a winning move!
+                return move, {
+                    'nodes_evaluated': 1,
+                    'nodes_pruned': 0,
+                    'depth_reached': {0: 1},
+                    'scores_at_depth': {0: [1000]}
+                }
+            self.undo_move(move)
+        
+        # SECOND: Check if we need to block human from winning
+        for move in valid_moves:
+            self.make_move(move, self.HUMAN)
+            if self.check_winner() == self.HUMAN:
+                self.undo_move(move)
+                # Block this move - human would win otherwise
+                return move, {
+                    'nodes_evaluated': 1,
+                    'nodes_pruned': 0,
+                    'depth_reached': {0: 1},
+                    'scores_at_depth': {0: [-1000]}
+                }
+            self.undo_move(move)
+        
+        # THIRD: Use minimax to find best move
         best_move = valid_moves[0]
         best_score = float('-inf')
         stats = {
