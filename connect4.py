@@ -1,65 +1,102 @@
 """
-Connect-4 Game Implementation
+Connect-4 Game
 
-Task Implementation:
-- Task 1: Lines 11-103 (Game setup, board, user input, display, win checking)
-- Task 2: Lines 165-186, 310-353 (Legal moves generation, search space display)
-- Task 3: Lines 188-285 (Minimax algorithm implementation)
-- Task 4: Lines 188-285 (Alpha-beta pruning integrated in minimax)
+Task implementations:
+- Task 1: Lines ... (Game setup, board, user input, display, win checking)
+- Task 2: Lines ..., ... (Legal moves generation, search space display)
+- Task 3: Lines ... (Minimax algorithm implementation)
+- Task 4: Lines ... (Alpha-beta pruning integrated in minimax)
+
+To RUN:
+conda env create -f environment.yaml
+conda activate connect4
+python connect4.py
 """
 
 import numpy as np
 from typing import List, Tuple, Optional
+import threading
+import time
+
+# Import GUI display (optional - will fall back to terminal if not available)
+try:
+    from board_display import BoardDisplay
+    GUI_AVAILABLE = True
+except ImportError:
+    GUI_AVAILABLE = False
+    BoardDisplay = None
 
 
 class Connect4:
-    """Connect-4 game implementation with minimax and alpha-beta pruning."""
     
     EMPTY = 0
     HUMAN = 1  # Red
     COMPUTER = 2  # Yellow
     
-    def __init__(self, rows=6, cols=7):
-        """Initialize the game board."""
+    def __init__(self, rows=6, cols=7, use_gui=True):
+        # Initialize the game board
         self.rows = rows
         self.cols = cols
-        self.board = np.zeros((rows, cols), dtype=int)
+        self.board = np.zeros((rows, cols), dtype=int) # init the board as a 2D array of zeros
         self.current_player = self.HUMAN  # Human goes first
         self.game_over = False
         self.winner = None
         
-    def display_board(self):
-        """Display the current board state."""
-        print("\n" + "=" * 50)
-        print("Current Board State:")
-        print("=" * 50)
-        # Print column numbers
-        print("  ", end="")
-        for col in range(self.cols):
-            print(f" {col} ", end="")
-        print()
+        # GUI setup
+        self.use_gui = use_gui and GUI_AVAILABLE
+        self.gui_display = None
+        self.selected_column = None
+        self.waiting_for_input = False
+        self.gui_initialized = False
         
-        # Print board with row numbers
-        for row in range(self.rows):
-            print(f"{row} ", end="")
+        if self.use_gui:
+            self.gui_display = BoardDisplay(rows, cols, on_column_click=self._on_gui_column_click)
+            self.gui_display.update_board(self.board, self.HUMAN, self.COMPUTER)
+    
+    def _on_gui_column_click(self, col: int):
+        """Handle column click from GUI."""
+        if self.waiting_for_input and self.is_valid_move(col):
+            self.selected_column = col
+            self.waiting_for_input = False
+        
+    def display_board(self):
+        # Display the current board state
+        if self.use_gui and self.gui_display:
+            # Update GUI display
+            self.gui_display.update_board(self.board, self.HUMAN, self.COMPUTER)
+            self.gui_display.update()
+        else:
+            # Fall back to terminal display
+            print("\n" + "=" * 50)
+            print("Current Board State:")
+            print("=" * 50)
+            # Print column numbers
+            print("  ", end="")
             for col in range(self.cols):
-                if self.board[row][col] == self.EMPTY:
-                    print(" . ", end="")
-                elif self.board[row][col] == self.HUMAN:
-                    print(" R ", end="")  # Red
-                else:
-                    print(" Y ", end="")  # Yellow
+                print(f" {col} ", end="")
             print()
-        print("=" * 50)
+            
+            # Print board with row numbers
+            for row in range(self.rows):
+                print(f"{row} ", end="")
+                for col in range(self.cols):
+                    if self.board[row][col] == self.EMPTY:
+                        print(" . ", end="")
+                    elif self.board[row][col] == self.HUMAN:
+                        print(" R ", end="")  # Red
+                    else:
+                        print(" Y ", end="")  # Yellow
+                print()
+            print("=" * 50)
         
     def is_valid_move(self, col: int) -> bool:
-        """Check if a move is valid (column not full)."""
+        # Check if a move is valid (column not full)
         if col < 0 or col >= self.cols:
             return False
         return self.board[0][col] == self.EMPTY
     
     def get_valid_moves(self) -> List[int]:
-        """Get all valid moves (columns that are not full)."""
+        # Get all valid moves (columns that are not full)
         valid_moves = []
         for col in range(self.cols):
             if self.is_valid_move(col):
@@ -67,7 +104,7 @@ class Connect4:
         return valid_moves
     
     def make_move(self, col: int, player: int) -> bool:
-        """Make a move by dropping a disc in the specified column."""
+        # Make a move by dropping a disc in the specified column
         if not self.is_valid_move(col):
             return False
         
@@ -79,14 +116,14 @@ class Connect4:
         return False
     
     def undo_move(self, col: int):
-        """Undo a move by removing the top disc from the column."""
+        # Undo a move by removing the top disc from the column
         for row in range(self.rows):
             if self.board[row][col] != self.EMPTY:
                 self.board[row][col] = self.EMPTY
                 return
     
     def check_winner(self) -> Optional[int]:
-        """Check if there's a winner. Returns player number or None."""
+        # Check if there's a winner. Returns player number or None.
         directions = [
             (0, 1),   # Horizontal
             (1, 0),   # Vertical
@@ -120,11 +157,11 @@ class Connect4:
         return None
     
     def is_board_full(self) -> bool:
-        """Check if the board is completely full."""
+        # Check if the board is completely full.
         return all(self.board[0][col] != self.EMPTY for col in range(self.cols))
     
     def evaluate_position(self) -> int:
-        """Evaluate the current board position from computer's perspective."""
+        # Evaluate the current board position from computer's perspective.
         winner = self.check_winner()
         if winner == self.COMPUTER:
             return 1000  # Computer wins
@@ -168,7 +205,7 @@ class Connect4:
         return score
     
     def generate_search_space_info(self, depth: int, current_depth: int = 0) -> dict:
-        """Generate search space information for display."""
+        # Generate search space information for display.
         info = {
             'level': current_depth,
             'moves': len(self.get_valid_moves()),
@@ -195,34 +232,11 @@ class Connect4:
                 beta: float = float('inf'),
                 use_alpha_beta: bool = False,
                 stats: dict = None) -> Tuple[int, dict]:
-        """
-        Minimax algorithm with optional alpha-beta pruning.
-        Returns (best_score, stats_dict)
-        """
-        if stats is None:
-            stats = {
-                'nodes_evaluated': 0,
-                'nodes_pruned': 0,
-                'depth_reached': {},
-                'scores_at_depth': {}
-            }
-        
-        stats['nodes_evaluated'] += 1
+        # Minimax algorithm with optional alpha-beta pruning
+        # Returns (best_score, stats_dict)
         
         # Check for terminal states
-        winner = self.check_winner()
-        if winner == self.COMPUTER:
-            stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
-            if depth not in stats['scores_at_depth']:
-                stats['scores_at_depth'][depth] = []
-            stats['scores_at_depth'][depth].append(1000)
-            return 1000, stats
-        elif winner == self.HUMAN:
-            stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
-            if depth not in stats['scores_at_depth']:
-                stats['scores_at_depth'][depth] = []
-            stats['scores_at_depth'][depth].append(-1000)
-            return -1000, stats
+        
         
         if self.is_board_full():
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
@@ -292,7 +306,7 @@ class Connect4:
             return min_eval, stats
     
     def get_best_move(self, depth: int, use_alpha_beta: bool = False) -> Tuple[int, dict]:
-        """Get the best move for the computer using minimax."""
+        # Get the best move for the computer using minimax
         valid_moves = self.get_valid_moves()
         if not valid_moves:
             return -1, {}
@@ -319,7 +333,7 @@ class Connect4:
         return best_move, stats
     
     def calculate_search_space_at_level(self, level: int, max_depth: int, player: int, max_calc_depth: int = 3) -> int:
-        """Recursively calculate the actual search space at a given level."""
+        # Recursively calculate the actual search space at a given level
         # Limit calculation depth to avoid long waits
         if level >= max_depth or level >= max_calc_depth:
             valid_moves = self.get_valid_moves()
@@ -343,7 +357,7 @@ class Connect4:
         return total
     
     def display_search_space_info(self, depth: int):
-        """Display search space information for all levels."""
+        # Display search space information for all levels
         print("\n" + "=" * 50)
         print("SEARCH SPACE INFORMATION")
         print("=" * 50)
@@ -390,7 +404,7 @@ class Connect4:
         print("=" * 50)
     
     def display_minimax_stats(self, stats: dict, use_alpha_beta: bool = False):
-        """Display minimax algorithm statistics."""
+        # Display minimax algorithm statistics
         print("\n" + "=" * 50)
         if use_alpha_beta:
             print("MINIMAX WITH ALPHA-BETA PRUNING RESULTS")
@@ -417,7 +431,7 @@ class Connect4:
         print("=" * 50)
     
     def play(self, search_depth: int = 3, use_alpha_beta: bool = False):
-        """Main game loop."""
+        # Main game loop
         print("\n" + "=" * 50)
         print("CONNECT-4 GAME")
         print("=" * 50)
@@ -427,8 +441,12 @@ class Connect4:
         print(f"Alpha-beta pruning: {'Enabled' if use_alpha_beta else 'Disabled'}")
         print("=" * 50)
         
-        # Display initial search space info
+        # Display initial search space info (always in terminal as required)
         self.display_search_space_info(search_depth)
+        
+        # Initialize GUI if using it (will be updated in main loop)
+        if self.use_gui:
+            self.gui_initialized = True
         
         while not self.game_over:
             self.display_board()
@@ -437,34 +455,75 @@ class Connect4:
                 # Human's turn
                 valid_moves = self.get_valid_moves()
                 if not valid_moves:
+                    if self.use_gui:
+                        self.gui_display.show_draw()
                     print("No valid moves available. Game is a draw!")
                     break
                 
-                print(f"\nYour turn (RED). Valid columns: {valid_moves}")
-                try:
-                    col = int(input("Enter column number (0-6): "))
-                    if col not in valid_moves:
-                        print("Invalid move! Please choose a valid column.")
+                if self.use_gui:
+                    # Use GUI for input
+                    self.gui_display.set_status("Your turn! Click a column to drop a disc.")
+                    self.gui_display.enable_buttons(valid_moves)
+                    self.waiting_for_input = True
+                    self.selected_column = None
+                    
+                    # Wait for user to click a column
+                    while self.waiting_for_input and not self.game_over:
+                        time.sleep(0.1)
+                        if self.gui_display:
+                            self.gui_display.update()
+                    
+                    if self.selected_column is not None:
+                        col = self.selected_column
+                        # Find the row where the disc will land
+                        for row in range(self.rows - 1, -1, -1):
+                            if self.board[row][col] == self.EMPTY:
+                                self.make_move(col, self.HUMAN)
+                                # Animate the drop
+                                if self.gui_display:
+                                    self.gui_display.animate_drop(col, row, self.HUMAN, self.board)
+                                break
+                else:
+                    # Terminal input
+                    print(f"\nYour turn (RED). Valid columns: {valid_moves}")
+                    try:
+                        col = int(input("Enter column number (0-6): "))
+                        if col not in valid_moves:
+                            print("Invalid move! Please choose a valid column.")
+                            continue
+                    except ValueError:
+                        print("Invalid input! Please enter a number.")
                         continue
-                except ValueError:
-                    print("Invalid input! Please enter a number.")
-                    continue
-                
-                self.make_move(col, self.HUMAN)
+                    
+                    self.make_move(col, self.HUMAN)
                 
             else:
                 # Computer's turn
+                if self.use_gui:
+                    self.gui_display.set_status("Computer is thinking...")
+                    self.gui_display.disable_buttons()
+                
                 print("\nComputer's turn (YELLOW)...")
                 best_move, stats = self.get_best_move(search_depth, use_alpha_beta)
                 
-                # Display minimax statistics
+                # Display minimax statistics (always in terminal as required)
                 self.display_minimax_stats(stats, use_alpha_beta)
                 
                 if best_move == -1:
+                    if self.use_gui:
+                        self.gui_display.show_draw()
                     print("No valid moves available. Game is a draw!")
                     break
                 
-                self.make_move(best_move, self.COMPUTER)
+                # Find the row where the disc will land
+                for row in range(self.rows - 1, -1, -1):
+                    if self.board[row][best_move] == self.EMPTY:
+                        self.make_move(best_move, self.COMPUTER)
+                        # Animate the drop
+                        if self.use_gui:
+                            self.gui_display.animate_drop(best_move, row, self.COMPUTER, self.board)
+                        break
+                
                 print(f"Computer plays column {best_move}")
             
             # Check for winner
@@ -473,6 +532,8 @@ class Connect4:
                 self.game_over = True
                 self.winner = winner
                 self.display_board()
+                if self.use_gui:
+                    self.gui_display.show_winner(winner, winner == self.HUMAN)
                 if winner == self.HUMAN:
                     print("\n🎉 Congratulations! You won!")
                 else:
@@ -483,6 +544,8 @@ class Connect4:
             if self.is_board_full():
                 self.game_over = True
                 self.display_board()
+                if self.use_gui:
+                    self.gui_display.show_draw()
                 print("\n🤝 It's a draw!")
                 break
             
@@ -490,23 +553,49 @@ class Connect4:
             self.current_player = self.COMPUTER if self.current_player == self.HUMAN else self.HUMAN
         
         print("\nGame Over!")
+        
+        # Keep GUI running if using it - let user close window
+        if self.use_gui and self.gui_display:
+            self.gui_display.set_status("Game Over! Close the window to exit.")
+            # Update GUI periodically until window is closed
+            try:
+                for _ in range(300):  # Wait up to 30 seconds
+                    self.gui_display.update()
+                    time.sleep(0.1)
+            except:
+                pass
 
-
+# Main function to run the game
 def main():
-    """Main function to run the game."""
     print("Connect-4 Game - AICE 2002 Assignment 2")
     print("\nConfiguration:")
     
-    try:
+    try: # Try to get input from the user
         depth = int(input("Enter search depth (recommended: 3-5): ") or "3")
         use_ab = input("Use alpha-beta pruning? (y/n, default: y): ").lower() != 'n'
-    except ValueError:
+        use_gui_input = input("Use GUI display? (y/n, default: y): ").lower()
+        use_gui = use_gui_input != 'n' if use_gui_input else True
+    except (ValueError, EOFError): # If fails, use default values
         depth = 3
         use_ab = True
-        print("Using default values: depth=3, alpha-beta=True")
+        use_gui = True
+        print("Using default values: depth=3, alpha-beta=True, GUI=True") # Default values
     
-    game = Connect4()
-    game.play(search_depth=depth, use_alpha_beta=use_ab)
+    game = Connect4(use_gui=use_gui) # Create a game instance
+    
+    # If using GUI, run game in a way that allows GUI updates
+    if use_gui and GUI_AVAILABLE:
+        # Start game in a thread or use after() callbacks
+        import threading
+        game_thread = threading.Thread(target=game.play, args=(depth, use_ab), daemon=True)
+        game_thread.start()
+        
+        # Run GUI in main thread
+        if game.gui_display:
+            game.gui_display.mainloop()
+    else:
+        # Terminal mode
+        game.play(search_depth=depth, use_alpha_beta=use_ab)
 
 
 if __name__ == "__main__":
