@@ -487,12 +487,8 @@ class Connect4:
                 
                 if self.selected_column is not None: # if a column is selected
                     col = self.selected_column
-                    # Find the row where the disc will land
-                    for row in range(self.rows - 1, -1, -1): # start from the bottom of the column
-                        if self.board[row][col] == self.EMPTY: # if the slot is empty
-                            self.make_move(col, self.HUMAN) # make the move
-                            self.gui_display.animate_drop(col, row, self.HUMAN, self.board) # animate the drop
-                            break
+                    self.make_move(col, self.HUMAN) # make the move
+                    self.display_board() # update the board display
                 
             else:
                 # Computer's turn
@@ -511,11 +507,8 @@ class Connect4:
                     break
                 
                 # Drop the disc
-                for row in range(self.rows - 1, -1, -1):
-                    if self.board[row][best_move] == self.EMPTY:
-                        self.make_move(best_move, self.COMPUTER) 
-                        self.gui_display.animate_drop(best_move, row, self.COMPUTER, self.board)
-                        break
+                self.make_move(best_move, self.COMPUTER)
+                self.display_board() # update the board display
                 
                 print(f"Computer plays column {best_move}")
             

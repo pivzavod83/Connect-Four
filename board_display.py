@@ -203,43 +203,6 @@ class BoardDisplay:
         self.set_status(message)
         messagebox.showinfo("Game Over", message) # show the message box
     
-    def animate_drop(self, col: int, row: int, player: int, board: np.ndarray):
-        # Animate disc falling
-        start_y = -self.slot_size
-        end_y = row * (self.slot_size + self.slot_padding) + self.slot_padding + self.slot_size // 2
-        x = col * (self.slot_size + self.slot_padding) + self.slot_padding + self.slot_size // 2
-        
-        color = self.HUMAN_COLOR if player == self.human_color else self.COMPUTER_COLOR
-        radius = self.slot_size // 2 - 2
-        
-        # Create animated disc
-        disc = self.canvas.create_oval(
-            x - radius, start_y - radius,
-            x + radius, start_y + radius,
-            fill=color,
-            outline=self.SLOT_OUTLINE,
-            width=2
-        )
-        
-        # Animate falling
-        steps = 20
-        step_size = (end_y - start_y) / steps
-        
-        def animate(step=0):
-            if step < steps:
-                y_pos = start_y + step * step_size
-                self.canvas.coords(
-                    disc,
-                    x - radius, y_pos - radius,
-                    x + radius, y_pos + radius
-                )
-                self.root.after(20, lambda: animate(step + 1))
-            else:
-                self.canvas.delete(disc)
-                self.update_board(board)
-        
-        animate()
-    
     def run(self):
         # Start the GUI event loop
         pass
