@@ -20,7 +20,7 @@ An intelligent Connect-4 game implementation featuring a GUI interface and AI op
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/pivzavod83/Connect-Four.git
 cd Connect-Four
 ```
 
