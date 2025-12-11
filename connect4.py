@@ -2,12 +2,16 @@
 Connect-4 Game
 
 Task implementations:
-- Task 1: Lines ... (Game setup, board, user input, display, win checking)
+- Task 1: Lines 36-49, 51-55, 57-60, 62-66, 68-73, 76-86, 89-94, 96-127, 129-131, 607-706, 708-732 (Game setup, board, user input, display, win checking)
           Functions: __init__,_on_gui_column_click, display_board, is_valid_move, get_valid_moves,
           make_move, undo_move, check_winner, is_board_full, play, main, class BoardDisplay
-- Task 2: Lines ..., ... (Legal moves generation, search space display)
-- Task 3: Lines ... (Minimax algorithm implementation)
-- Task 4: Lines ... (Alpha-beta pruning integrated in minimax)
+- Task 2: Lines 68-73, 178-198, 490-510, 514-559 (Legal moves generation, search space display)
+          Functions: get_valid_moves, generate_search_space_info, calculate_search_space_at_level,
+          display_search_space_info
+- Task 3: Lines 133-176, 201-405, 407-487 (Minimax algorithm implementation)
+          Functions: minimax, evaluate_position, get_best_move
+- Task 4: Lines 201-405 (Alpha-beta pruning integrated in minimax)
+          Functions: minimax (with use_alpha_beta parameter and pruning logic)
 
 To RUN:
 conda env create -f environment.yaml
@@ -137,7 +141,8 @@ class Connect4:
         if self.is_board_full():
             return 0  # Draw
         
-        # Heuristic: count potential winning lines
+        # Heuristic
+        # Count potential winning lines for computer and human
         score = 0
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         
@@ -152,20 +157,20 @@ class Connect4:
                         new_row = row + dr * i
                         new_col = col + dc * i
                         
-                        if not (0 <= new_row < self.rows and 0 <= new_col < self.cols):
+                        if not (0 <= new_row < self.rows and 0 <= new_col < self.cols): # check if the new row and column are in bounds
                             break
                         
-                        if self.board[new_row][new_col] == self.COMPUTER:
+                        if self.board[new_row][new_col] == self.COMPUTER: # check if the slot is a computer disc
                             computer_count += 1
-                        elif self.board[new_row][new_col] == self.HUMAN:
+                        elif self.board[new_row][new_col] == self.HUMAN: # check if the slot is a human disc
                             human_count += 1
                         else:
-                            empty_count += 1
+                            empty_count += 1 # check if the slot is empty
                     else:
                         # All 4 positions are valid
-                        if computer_count > 0 and human_count == 0:
+                        if computer_count > 0 and human_count == 0: # check if the computer has a winning line
                             score += computer_count ** 2
-                        elif human_count > 0 and computer_count == 0:
+                        elif human_count > 0 and computer_count == 0: # check if the human has a winning line
                             score -= human_count ** 2
         
         return score
@@ -173,23 +178,23 @@ class Connect4:
     def generate_search_space_info(self, depth: int, current_depth: int = 0) -> dict:
         # Generate search space information for display.
         info = {
-            'level': current_depth,
-            'moves': len(self.get_valid_moves()),
-            'total_moves': 0
+            'level': current_depth, # the current depth
+            'moves': len(self.get_valid_moves()), # the number of valid moves
+            'total_moves': 0 # the total number of moves
         }
         
-        if current_depth < depth and not self.check_winner() and not self.is_board_full():
+        if current_depth < depth and not self.check_winner() and not self.is_board_full(): # check if the game is not over
             valid_moves = self.get_valid_moves()
-            total = 0
+            total = 0 # the total number of moves
             for move in valid_moves:
-                self.make_move(move, self.HUMAN if current_depth % 2 == 0 else self.COMPUTER)
-                sub_info = self.generate_search_space_info(depth, current_depth + 1)
-                total += sub_info['total_moves'] if sub_info['total_moves'] > 0 else 1
+                self.make_move(move, self.HUMAN if current_depth % 2 == 0 else self.COMPUTER) # make the move for the human or computer
+                sub_info = self.generate_search_space_info(depth, current_depth + 1) # generate the search space information for the next depth
+                total += sub_info['total_moves'] if sub_info['total_moves'] > 0 else 1 # add the total number of moves
                 self.undo_move(move)
             
-            info['total_moves'] = len(valid_moves) * (total if total > 0 else 1)
+            info['total_moves'] = len(valid_moves) * (total if total > 0 else 1) # multiply the number of valid moves by the total number of moves
         else:
-            info['total_moves'] = 1
+            info['total_moves'] = 1 # if the game is over, set the total number of moves to 1
         
         return info
     
@@ -199,9 +204,8 @@ class Connect4:
                 use_alpha_beta: bool = False,
                 stats: dict = None) -> Tuple[int, dict]:
         # Minimax algorithm with optional alpha-beta pruning
-        # Returns (best_score, stats_dict)
         
-        if stats is None:
+        if stats is None: # stats for terminal
             stats = {
                 'nodes_evaluated': 0,
                 'nodes_pruned': 0,
@@ -216,29 +220,29 @@ class Connect4:
         current_alpha = alpha
         current_beta = beta
         
-        # Check for terminal states - WIN CHECK FIRST (most important!)
+        # Check for terminal states
         winner = self.check_winner()
-        if winner == self.COMPUTER:
+        if winner == self.COMPUTER: # check for immediate win
             stats['best_path'] = []  # Terminal state, no further moves
-            stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
-            if depth not in stats['scores_at_depth']:
-                stats['scores_at_depth'][depth] = []
-            stats['scores_at_depth'][depth].append(1000)
+            stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1 # increment the depth
+            if depth not in stats['scores_at_depth']: # if the depth is not in the scores at depth
+                stats['scores_at_depth'][depth] = [] # initialize the scores at depth
+            stats['scores_at_depth'][depth].append(1000) # append the score
             return 1000, stats
-        elif winner == self.HUMAN:
+        elif winner == self.HUMAN: # check for immediate loss
             stats['best_path'] = []  # Terminal state, no further moves
-            stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
-            if depth not in stats['scores_at_depth']:
-                stats['scores_at_depth'][depth] = []
-            stats['scores_at_depth'][depth].append(-1000)
+            stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1 # increment the depth
+            if depth not in stats['scores_at_depth']: # if the depth is not in the scores at depth
+                stats['scores_at_depth'][depth] = [] # initialize the scores at depth
+            stats['scores_at_depth'][depth].append(-1000) # append the score
             return -1000, stats
         
         if self.is_board_full():
             stats['best_path'] = []  # Terminal state, no further moves
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
-            if depth not in stats['scores_at_depth']:
-                stats['scores_at_depth'][depth] = []
-            stats['scores_at_depth'][depth].append(0)
+            if depth not in stats['scores_at_depth']: # if the depth is not in the scores at depth
+                stats['scores_at_depth'][depth] = [] # initialize the scores at depth
+            stats['scores_at_depth'][depth].append(0) # append the score
             return 0, stats
         
         if depth == 0:
@@ -261,15 +265,14 @@ class Connect4:
             return score, stats
         
         if is_maximizing:
-            max_eval = float('-inf')
+            max_eval = float('-inf') # the maximum evaluation score
             best_path = None
             move_scores = []
             
             for move in valid_moves:
-                self.make_move(move, self.COMPUTER)
+                self.make_move(move, self.COMPUTER) # make the move for the computer
                 eval_score, stats = self.minimax(depth - 1, False, alpha, beta, 
                                                  use_alpha_beta, stats)
-                # Capture best_path immediately after recursive call before it gets overwritten
                 recursive_best_path = stats.get('best_path', [])
                 self.undo_move(move)
                 
@@ -286,13 +289,14 @@ class Connect4:
                 
                 if eval_score > max_eval:
                     max_eval = eval_score
-                    # Build path: current move + best path from recursive call
+                    # Build path
+                    # current move + best path from recursive call
                     if recursive_best_path:
                         best_path = [move] + recursive_best_path
                     else:
                         best_path = [move]
                 
-                if use_alpha_beta:
+                if use_alpha_beta: # if alpha-beta pruning is used
                     alpha = max(alpha, eval_score)
                     if beta <= alpha:
                         # Track pruned moves
@@ -355,13 +359,14 @@ class Connect4:
                 
                 if eval_score < min_eval:
                     min_eval = eval_score
-                    # Build path: current move + best path from recursive call
+                    # Build path
+                    # current move + best path from recursive call
                     if recursive_best_path:
                         best_path = [move] + recursive_best_path
                     else:
                         best_path = [move]
                 
-                if use_alpha_beta:
+                if use_alpha_beta: # if alpha-beta pruning is used
                     beta = min(beta, eval_score)
                     if beta <= alpha:
                         # Track pruned moves
@@ -405,14 +410,14 @@ class Connect4:
         if not valid_moves:
             return -1, {}
         
-        # FIRST: Check for immediate winning moves (highest priority!)
+        # Check for immediate winning moves
         nodes_checked = 0
         for move in valid_moves:
             nodes_checked += 1
             self.make_move(move, self.COMPUTER)
             if self.check_winner() == self.COMPUTER:
                 self.undo_move(move)
-                # Return immediately - this is a winning move!
+                # Return immediately
                 return move, {
                     'nodes_evaluated': nodes_checked,  # Track actual nodes checked
                     'nodes_pruned': 0,
@@ -421,14 +426,14 @@ class Connect4:
                 }
             self.undo_move(move)
         
-        # SECOND: Check if we need to block human from winning
+        # Check if we need to block human from winning
         nodes_checked = 0
         for move in valid_moves:
             nodes_checked += 1
             self.make_move(move, self.HUMAN)
             if self.check_winner() == self.HUMAN:
                 self.undo_move(move)
-                # Block this move - human would win otherwise
+                # Block this move
                 return move, {
                     'nodes_evaluated': nodes_checked,  # Track actual nodes checked
                     'nodes_pruned': 0,
@@ -437,7 +442,7 @@ class Connect4:
                 }
             self.undo_move(move)
         
-        # THIRD: Use minimax to find best move
+        # Use minimax to find best move
         best_move = valid_moves[0]
         best_score = float('-inf')
         best_path = None
@@ -459,7 +464,7 @@ class Connect4:
             self.make_move(move, self.COMPUTER)
             score, stats = self.minimax(depth - 1, False, float('-inf'), float('inf'), 
                                        use_alpha_beta, stats)
-            # Capture best_path immediately after recursive call before it gets overwritten
+            # Capture best_path after recursive call before it gets overwritten
             full_path = stats.get('best_path', [move])
             self.undo_move(move)
             
@@ -535,8 +540,8 @@ class Connect4:
                 total_at_level = num_moves
                 print(f"Level {level} ({player_name}): {num_moves} possible moves")
             else:
-                # For deeper levels, calculate recursively (but limit to avoid long waits)
-                # Calculate up to 3 levels deep for accuracy, then estimate
+                # For deeper levels, calculate recursively
+                # Calculate up to 3 levels deep for accuracy
                 if level <= 3:
                     total_at_level = self.calculate_search_space_at_level(level, depth, player, max_calc_depth=3)
                     print(f"Level {level} ({player_name}): {num_moves} possible moves")
@@ -546,11 +551,10 @@ class Connect4:
                             estimated = num_moves * (self.cols ** (depth - level))
                             print(f"  Estimated total positions (full depth): ~{estimated}")
                 else:
-                    # For deeper searches, provide estimate
+                    # For deeper searches, provide an estimate
                     total_at_level = num_moves * (self.cols ** (depth - level))
                     print(f"Level {level} ({player_name}): {num_moves} possible moves")
-                    print(f"  [ESTIMATE] Total positions at this level: ~{total_at_level}")
-                    print(f"  Note: This is an approximation, not actual calculated data")
+                    print(f"  Estimated total positions at this level: ~{total_at_level}")
         
         print("=" * 50)
     
