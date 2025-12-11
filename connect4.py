@@ -206,20 +206,27 @@ class Connect4:
                 'nodes_evaluated': 0,
                 'nodes_pruned': 0,
                 'depth_reached': {},
-                'scores_at_depth': {}
+                'scores_at_depth': {},
+                'alpha_beta_history': [],
+                'move_evaluations': [],
+                'pruned_moves': []
             }
         
         stats['nodes_evaluated'] += 1
+        current_alpha = alpha
+        current_beta = beta
         
         # Check for terminal states - WIN CHECK FIRST (most important!)
         winner = self.check_winner()
         if winner == self.COMPUTER:
+            stats['best_path'] = []  # Terminal state, no further moves
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
             if depth not in stats['scores_at_depth']:
                 stats['scores_at_depth'][depth] = []
             stats['scores_at_depth'][depth].append(1000)
             return 1000, stats
         elif winner == self.HUMAN:
+            stats['best_path'] = []  # Terminal state, no further moves
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
             if depth not in stats['scores_at_depth']:
                 stats['scores_at_depth'][depth] = []
@@ -227,6 +234,7 @@ class Connect4:
             return -1000, stats
         
         if self.is_board_full():
+            stats['best_path'] = []  # Terminal state, no further moves
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
             if depth not in stats['scores_at_depth']:
                 stats['scores_at_depth'][depth] = []
@@ -234,6 +242,7 @@ class Connect4:
             return 0, stats
         
         if depth == 0:
+            stats['best_path'] = []  # Leaf node, no further moves
             score = self.evaluate_position()
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
             if depth not in stats['scores_at_depth']:
@@ -243,6 +252,7 @@ class Connect4:
         
         valid_moves = self.get_valid_moves()
         if not valid_moves:
+            stats['best_path'] = []  # No valid moves, terminal state
             score = self.evaluate_position()
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
             if depth not in stats['scores_at_depth']:
@@ -252,20 +262,68 @@ class Connect4:
         
         if is_maximizing:
             max_eval = float('-inf')
+            best_path = None
+            move_scores = []
+            
             for move in valid_moves:
                 self.make_move(move, self.COMPUTER)
                 eval_score, stats = self.minimax(depth - 1, False, alpha, beta, 
                                                  use_alpha_beta, stats)
+                # Capture best_path immediately after recursive call before it gets overwritten
+                recursive_best_path = stats.get('best_path', [])
                 self.undo_move(move)
                 
-                max_eval = max(max_eval, eval_score)
+                # Track move evaluation
+                move_info = {
+                    'move': move,
+                    'score': eval_score,
+                    'depth': depth,
+                    'alpha': alpha,
+                    'beta': beta,
+                    'pruned': False
+                }
+                move_scores.append(move_info)
+                
+                if eval_score > max_eval:
+                    max_eval = eval_score
+                    # Build path: current move + best path from recursive call
+                    if recursive_best_path:
+                        best_path = [move] + recursive_best_path
+                    else:
+                        best_path = [move]
                 
                 if use_alpha_beta:
                     alpha = max(alpha, eval_score)
                     if beta <= alpha:
-                        stats['nodes_pruned'] += len(valid_moves) - valid_moves.index(move) - 1
+                        # Track pruned moves
+                        remaining_moves = valid_moves[valid_moves.index(move) + 1:]
+                        for pruned_move in remaining_moves:
+                            stats['pruned_moves'].append({
+                                'move': pruned_move,
+                                'depth': depth,
+                                'alpha': alpha,
+                                'beta': beta,
+                                'reason': 'beta <= alpha'
+                            })
+                        stats['nodes_pruned'] += len(remaining_moves)
                         break
             
+            # Store best path in stats
+            if best_path:
+                stats['best_path'] = best_path
+            
+            # Store alpha/beta history
+            stats['alpha_beta_history'].append({
+                'depth': depth,
+                'is_maximizing': True,
+                'alpha': current_alpha,
+                'beta': current_beta,
+                'final_alpha': alpha,
+                'final_beta': beta,
+                'best_score': max_eval
+            })
+            
+            stats['move_evaluations'].extend(move_scores)
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
             if depth not in stats['scores_at_depth']:
                 stats['scores_at_depth'][depth] = []
@@ -273,20 +331,68 @@ class Connect4:
             return max_eval, stats
         else:
             min_eval = float('inf')
+            best_path = None
+            move_scores = []
+            
             for move in valid_moves:
                 self.make_move(move, self.HUMAN)
                 eval_score, stats = self.minimax(depth - 1, True, alpha, beta, 
                                                  use_alpha_beta, stats)
+                # Capture best_path immediately after recursive call before it gets overwritten
+                recursive_best_path = stats.get('best_path', [])
                 self.undo_move(move)
                 
-                min_eval = min(min_eval, eval_score)
+                # Track move evaluation
+                move_info = {
+                    'move': move,
+                    'score': eval_score,
+                    'depth': depth,
+                    'alpha': alpha,
+                    'beta': beta,
+                    'pruned': False
+                }
+                move_scores.append(move_info)
+                
+                if eval_score < min_eval:
+                    min_eval = eval_score
+                    # Build path: current move + best path from recursive call
+                    if recursive_best_path:
+                        best_path = [move] + recursive_best_path
+                    else:
+                        best_path = [move]
                 
                 if use_alpha_beta:
                     beta = min(beta, eval_score)
                     if beta <= alpha:
-                        stats['nodes_pruned'] += len(valid_moves) - valid_moves.index(move) - 1
+                        # Track pruned moves
+                        remaining_moves = valid_moves[valid_moves.index(move) + 1:]
+                        for pruned_move in remaining_moves:
+                            stats['pruned_moves'].append({
+                                'move': pruned_move,
+                                'depth': depth,
+                                'alpha': alpha,
+                                'beta': beta,
+                                'reason': 'beta <= alpha'
+                            })
+                        stats['nodes_pruned'] += len(remaining_moves)
                         break
             
+            # Store best path in stats
+            if best_path:
+                stats['best_path'] = best_path
+            
+            # Store alpha/beta history
+            stats['alpha_beta_history'].append({
+                'depth': depth,
+                'is_maximizing': False,
+                'alpha': current_alpha,
+                'beta': current_beta,
+                'final_alpha': alpha,
+                'final_beta': beta,
+                'best_score': min_eval
+            })
+            
+            stats['move_evaluations'].extend(move_scores)
             stats['depth_reached'][depth] = stats['depth_reached'].get(depth, 0) + 1
             if depth not in stats['scores_at_depth']:
                 stats['scores_at_depth'][depth] = []
@@ -300,52 +406,79 @@ class Connect4:
             return -1, {}
         
         # FIRST: Check for immediate winning moves (highest priority!)
+        nodes_checked = 0
         for move in valid_moves:
+            nodes_checked += 1
             self.make_move(move, self.COMPUTER)
             if self.check_winner() == self.COMPUTER:
                 self.undo_move(move)
                 # Return immediately - this is a winning move!
                 return move, {
-                    'nodes_evaluated': 1,
+                    'nodes_evaluated': nodes_checked,  # Track actual nodes checked
                     'nodes_pruned': 0,
-                    'depth_reached': {0: 1},
-                    'scores_at_depth': {0: [1000]}
+                    'depth_reached': {0: nodes_checked},  # Reflect actual depth reached
+                    'scores_at_depth': {0: [1000] * nodes_checked}  # One score per node checked
                 }
             self.undo_move(move)
         
         # SECOND: Check if we need to block human from winning
+        nodes_checked = 0
         for move in valid_moves:
+            nodes_checked += 1
             self.make_move(move, self.HUMAN)
             if self.check_winner() == self.HUMAN:
                 self.undo_move(move)
                 # Block this move - human would win otherwise
                 return move, {
-                    'nodes_evaluated': 1,
+                    'nodes_evaluated': nodes_checked,  # Track actual nodes checked
                     'nodes_pruned': 0,
-                    'depth_reached': {0: 1},
-                    'scores_at_depth': {0: [-1000]}
+                    'depth_reached': {0: nodes_checked},  # Reflect actual depth reached
+                    'scores_at_depth': {0: [-1000] * nodes_checked}  # One score per node checked
                 }
             self.undo_move(move)
         
         # THIRD: Use minimax to find best move
         best_move = valid_moves[0]
         best_score = float('-inf')
+        best_path = None
+        move_evaluations = []
+        
         stats = {
             'nodes_evaluated': 0,
             'nodes_pruned': 0,
             'depth_reached': {},
-            'scores_at_depth': {}
+            'scores_at_depth': {},
+            'alpha_beta_history': [],
+            'move_evaluations': [],
+            'pruned_moves': [],
+            'selected_path': None,
+            'selected_score': None
         }
         
         for move in valid_moves:
             self.make_move(move, self.COMPUTER)
             score, stats = self.minimax(depth - 1, False, float('-inf'), float('inf'), 
                                        use_alpha_beta, stats)
+            # Capture best_path immediately after recursive call before it gets overwritten
+            full_path = stats.get('best_path', [move])
             self.undo_move(move)
+            
+            move_evaluations.append({
+                'move': move,
+                'score': score,
+                'path': full_path
+            })
             
             if score > best_score:
                 best_score = score
                 best_move = move
+                best_path = full_path
+        
+        # Store selected path information
+        stats['selected_path'] = best_path
+        stats['selected_move'] = best_move  # Store the actual selected move
+        stats['selected_score'] = best_score
+        stats['root_move_evaluations'] = move_evaluations
         
         return best_move, stats
     
@@ -410,13 +543,14 @@ class Connect4:
                     if level < depth:
                         print(f"  Calculated positions at this level: {total_at_level}")
                         if depth > 3:
-                            estimated = num_moves * (7 ** (depth - level))
+                            estimated = num_moves * (self.cols ** (depth - level))
                             print(f"  Estimated total positions (full depth): ~{estimated}")
                 else:
                     # For deeper searches, provide estimate
-                    total_at_level = num_moves * (7 ** (depth - level))
+                    total_at_level = num_moves * (self.cols ** (depth - level))
                     print(f"Level {level} ({player_name}): {num_moves} possible moves")
-                    print(f"  Estimated total positions at this level: ~{total_at_level}")
+                    print(f"  [ESTIMATE] Total positions at this level: ~{total_at_level}")
+                    print(f"  Note: This is an approximation, not actual calculated data")
         
         print("=" * 50)
     
@@ -444,6 +578,25 @@ class Connect4:
             if scores:
                 print(f"  Depth {depth}: min={min(scores)}, max={max(scores)}, "
                       f"avg={sum(scores)/len(scores):.2f}, count={len(scores)}")
+        
+        # Display selected path summary
+        if 'selected_path' in stats and stats['selected_path'] is not None:
+            print("\n" + "=" * 50)
+            print("SELECTED PATH SUMMARY")
+            print("=" * 50)
+            selected_move = stats.get('selected_move', stats['selected_path'][0] if stats['selected_path'] else 'N/A')
+            print(f"Selected Move: Column {selected_move}")
+            print(f"Path Value: {stats['selected_score']}")
+            print(f"Path Length: {len(stats['selected_path'])} moves")
+            if len(stats['selected_path']) > 0:
+                print(f"Path Sequence: {' -> '.join([f'Col {m}' for m in stats['selected_path']])}")
+            
+            # Display root level move evaluations
+            if 'root_move_evaluations' in stats:
+                print("\nRoot Level Move Evaluations:")
+                for eval_info in stats['root_move_evaluations']:
+                    marker = " <-- SELECTED" if eval_info['move'] == selected_move else ""
+                    print(f"  Column {eval_info['move']}: Score = {eval_info['score']}{marker}")
         
         print("=" * 50)
     

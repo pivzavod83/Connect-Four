@@ -88,7 +88,7 @@ class BoardDisplay:
         # Status label
         self.status_label = tk.Label(
             self.root,
-            text="Click a column to drop a disc",
+            text="Click a button to drop a disc (1-7)",
             bg="#0F172A",
             fg=self.TEXT_COLOR,
             font=("Arial", 14, "bold"),
